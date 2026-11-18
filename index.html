@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Magicdle</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0c0c0e;--panel:#17171b;--line:#2c2a25;--gold:#c9a24b;--gold2:#e8cf8a;--txt:#e9e6df;--mut:#8d8a82;--bad:#a8423a;--ok:#4f9a5b}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at top,#1d1a14 0,var(--bg) 60%) fixed;color:var(--txt);font-family:system-ui,sans-serif;height:100vh;height:100dvh;overflow:hidden;display:flex;flex-direction:column}
+h1,h2,.brand{font-family:Cinzel,Georgia,serif}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line)}
+.brand{font-size:1.4rem;color:var(--gold2);letter-spacing:.08em;font-weight:700}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+button{font:inherit;cursor:pointer;color:var(--txt);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 14px;min-height:42px}
+button:hover{border-color:var(--gold)}
+button.on{border-color:var(--gold);color:var(--gold2)}
+button.primary{background:linear-gradient(#d4b05a,#a98532);color:#15110a;border:0;font-weight:700}
+select{font:inherit;color:var(--txt);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-height:42px;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}
+main{flex:1;min-height:0;width:100%;max-width:1000px;margin:0 auto;padding:10px 16px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px}
+.cardcol{min-height:0;container-type:size;display:flex;align-items:center;justify-content:center}
+.panel{min-height:0;display:flex;flex-direction:column;justify-content:center;text-align:center;overflow:hidden}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+@media (max-width:700px){main{grid-template-columns:1fr;grid-template-rows:minmax(0,42%) minmax(0,1fr);gap:6px;padding:6px 10px}header{padding:6px 10px}.brand{font-size:1.1rem}button,select{padding:5px 9px;min-height:34px;font-size:.85rem}.sub{margin:2px 0 4px}.pips{margin:6px 0 2px}.search{margin:6px 0}.g{padding:4px 10px}.guesses{gap:4px}}
+h2{margin:0;color:var(--gold2);font-size:1.3rem}
+.sub{color:var(--mut);font-size:.9rem;margin:4px 0 14px}
+.card{height:min(100cqh,calc(100cqw * 1.3934));aspect-ratio:488/680;border-radius:4.5%;overflow:hidden;background:var(--panel);border:1px solid var(--line);box-shadow:0 10px 40px #000a;position:relative}
+.card img{width:100%;height:100%;display:block;transition:filter .9s ease;transform:scale(1.001)}
+.card.loading::after{content:attr(data-loading);position:absolute;inset:0;display:grid;place-items:center;color:var(--mut)}
+.pips{display:flex;gap:8px;justify-content:center;margin:16px 0 6px}
+.pip{width:34px;height:10px;border-radius:5px;background:var(--line)}
+.pip.bad{background:var(--bad)}.pip.ok{background:var(--ok)}
+.search{position:relative;margin:12px 0;display:flex;gap:8px}
+input{flex:1;min-width:0;font:inherit;color:var(--txt);background:#101013;border:1px solid var(--line);border-radius:8px;padding:11px 12px;min-height:44px}
+input:focus{outline:none;border-color:var(--gold)}
+.dd{position:absolute;top:48px;left:0;right:90px;background:#121215;border:1px solid var(--gold);border-radius:8px;z-index:5;text-align:left;max-height:260px;overflow:auto}
+.dd div{padding:10px 12px;cursor:pointer}
+.dd div.sel,.dd div:hover{background:#26221a;color:var(--gold2)}
+.guesses{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.g{background:var(--panel);border:1px solid var(--bad);border-radius:8px;padding:6px 12px;text-align:left;display:flex;justify-content:space-between}
+.msg{min-height:20px;color:var(--bad);font-size:.9rem}
+.res{margin-top:14px;padding:14px;border:1px solid var(--gold);border-radius:10px;background:var(--panel)}
+.res.win{border-color:var(--ok)}
+.modal{position:fixed;inset:0;background:#000c;display:none;place-items:center;padding:16px;z-index:10}
+.modal.show{display:grid}
+.box{background:var(--panel);border:1px solid var(--gold);border-radius:12px;padding:20px;max-width:440px;width:100%;max-height:88vh;overflow:auto;text-align:left}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center;margin:14px 0}
+.stats b{display:block;font-size:1.4rem;color:var(--gold2);font-family:Cinzel,serif}
+.stats span{font-size:.7rem;color:var(--mut)}
+.bar{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:.85rem}
+.bar i{display:block;background:var(--gold);height:16px;border-radius:3px;min-width:4px}
+footer{padding:6px 16px;border-top:1px solid var(--line);color:var(--mut);font-size:.68rem;text-align:center;line-height:1.35}
+footer a{color:var(--gold)}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">⚜ MAGICDLE</div>
+  <nav>
+    <button id="nDaily" class="on">Daily Challenge</button>
+    <button id="nPractice">Practice</button>
+    <button id="nStats">Statistics</button>
+    <button id="nHelp">How to Play</button>
+    <select id="lang" aria-label="Language"><option value="pt">Português</option><option value="en">English</option><option value="es">Español</option></select>
+  </nav>
+</header>
+<main>
+  <div class="cardcol"><div class="card loading" id="card"><img id="img" alt="" style="filter:blur(30px)"></div></div>
+  <div class="panel">
+    <h2 id="title"></h2>
+    <div class="sub" id="date"></div>
+    <div class="pips" id="pips"></div>
+    <div class="sub" id="left"></div>
+    <div class="sub" id="fmtRow" hidden><span id="fmtLbl"></span> <select id="fmtSel"></select></div>
+    <div class="search" id="searchRow">
+      <input id="q" placeholder="" autocomplete="off" spellcheck="false" aria-label="Card name">
+      <button class="primary" id="go">Guess</button>
+      <div class="dd" id="dd" hidden></div>
+    </div>
+    <div class="msg" id="msg" role="status"></div>
+    <div class="guesses" id="guesses"></div>
+    <div id="result"></div>
+  </div>
+</main>
+<footer id="foot"></footer>
+
+<div class="modal" id="mStats"><div class="box"></div></div>
+<div class="modal" id="mHelp"><div class="box" id="helpBox"></div></div>
+
+<script>
+'use strict';
+/* ---------- Config ---------- */
+const API = 'https://api.scryfall.com';
+const MAX = 5, BLUR = [30, 21, 13, 6, 0], PTS = [1000, 800, 600, 400, 200];
+const EPOCH = Date.UTC(2026, 0, 1);
+const POOL = 'game:paper lang:en -is:oversized (layout:normal OR layout:transform OR layout:modal_dfc OR layout:saga OR layout:adventure OR layout:split OR layout:flip OR layout:class OR layout:mutate OR layout:prototype OR layout:leveler)';
+
+/* ---------- i18n (UI language selectable; card names/images always English) ---------- */
+const I18N = {
+  en: { daily:'Daily Challenge', practice:'Practice', stats:'Statistics', help:'How to Play', ph:'Type a card name…', guess:'Guess', close:'Close', loading:'Summoning card…', alt:'Mystery Magic card',
+    dailyTitle:'Daily Challenge #{n}', practiceTitle:'Practice Mode', practiceSub:'Unlimited random cards — no effect on your streak',
+    attempt:'Attempt {n} of {m} — {r} remaining', win:'✨ Victory!', lose:'💀 Game Over', solved1:'Solved in 1 attempt — {p} points', solvedN:'Solved in {n} attempts — {p} points', loseSub:'Better luck next time.',
+    share:'Share result', next:'Next card at 00:00 UTC', again:'New card', copied:'Result copied to clipboard!', copyPrompt:'Copy your result:', score:'Score: {p} points', tomorrow:'Play tomorrow!',
+    empty:'Enter a card name first.', dupe:'You already guessed that card.', fail:'Could not load the card ({e}).', retry:'Retry',
+    played:'Played', rate:'Win rate', streak:'Streak', best:'Best', won:'Victories', avg:'Avg. attempts', pts:'Total points', today:'Today', dist:'Guess distribution',
+    helpHtml:'<h2>How to Play</h2><p>Identify the mystery Magic card from a blurred image. You have <b>5 attempts</b>; each wrong guess makes the card clearer.</p><p>Score: 1000 / 800 / 600 / 400 / 200 points for solving on attempt 1–5.</p><p><b>Daily Challenge</b>: one card per day (UTC), affects your streak. <b>Practice</b>: unlimited random cards, no effect on stats.</p><p>Card names and images are always in English. Any printing counts; only the card\'s name matters.</p>',
+    foot:'Card data and images courtesy of <a href="https://scryfall.com" target="_blank" rel="noopener">Scryfall</a>. Magic: The Gathering is © Wizards of the Coast. Magicdle is unofficial fan content, not approved or endorsed by Wizards of the Coast or Scryfall.' },
+  pt: { daily:'Desafio Diário', practice:'Treino', stats:'Estatísticas', help:'Como Jogar', ph:'Digite o nome da carta (em inglês)…', guess:'Chutar', close:'Fechar', loading:'Invocando carta…', alt:'Carta misteriosa de Magic',
+    dailyTitle:'Desafio Diário #{n}', practiceTitle:'Modo Treino', practiceSub:'Cartas aleatórias ilimitadas — não afeta sua sequência',
+    attempt:'Tentativa {n} de {m} — restam {r}', win:'✨ Vitória!', lose:'💀 Fim de jogo', solved1:'Resolvido em 1 tentativa — {p} pontos', solvedN:'Resolvido em {n} tentativas — {p} pontos', loseSub:'Mais sorte na próxima vez.',
+    share:'Compartilhar resultado', next:'Próxima carta às 00:00 UTC', again:'Nova carta', copied:'Resultado copiado!', copyPrompt:'Copie seu resultado:', score:'Pontuação: {p} pontos', tomorrow:'Jogue amanhã!',
+    empty:'Digite o nome de uma carta.', dupe:'Você já chutou essa carta.', fail:'Não foi possível carregar a carta ({e}).', retry:'Tentar de novo',
+    played:'Jogos', rate:'Vitórias %', streak:'Sequência', best:'Melhor', won:'Vitórias', avg:'Média de tentativas', pts:'Pontos totais', today:'Hoje', dist:'Distribuição de acertos',
+    helpHtml:'<h2>Como Jogar</h2><p>Descubra a carta misteriosa de Magic a partir de uma imagem borrada. Você tem <b>5 tentativas</b>; cada erro deixa a carta mais nítida.</p><p>Pontos: 1000 / 800 / 600 / 400 / 200 por acertar na tentativa 1–5.</p><p><b>Desafio Diário</b>: uma carta por dia (UTC), conta para sua sequência. <b>Treino</b>: cartas aleatórias ilimitadas, sem efeito nas estatísticas.</p><p>Os nomes e imagens das cartas são sempre em inglês. Qualquer impressão vale; só o nome da carta importa.</p>',
+    foot:'Dados e imagens das cartas por <a href="https://scryfall.com" target="_blank" rel="noopener">Scryfall</a>. Magic: The Gathering é © Wizards of the Coast. Magicdle é conteúdo não oficial de fã, sem aprovação ou apoio da Wizards of the Coast ou do Scryfall.' },
+  es: { daily:'Desafío Diario', practice:'Práctica', stats:'Estadísticas', help:'Cómo Jugar', ph:'Escribe el nombre de la carta (en inglés)…', guess:'Adivinar', close:'Cerrar', loading:'Invocando carta…', alt:'Carta misteriosa de Magic',
+    dailyTitle:'Desafío Diario #{n}', practiceTitle:'Modo Práctica', practiceSub:'Cartas aleatorias ilimitadas — no afecta tu racha',
+    attempt:'Intento {n} de {m} — quedan {r}', win:'✨ ¡Victoria!', lose:'💀 Fin del juego', solved1:'Resuelto en 1 intento — {p} puntos', solvedN:'Resuelto en {n} intentos — {p} puntos', loseSub:'Más suerte la próxima vez.',
+    share:'Compartir resultado', next:'Próxima carta a las 00:00 UTC', again:'Nueva carta', copied:'¡Resultado copiado!', copyPrompt:'Copia tu resultado:', score:'Puntuación: {p} puntos', tomorrow:'¡Juega mañana!',
+    empty:'Escribe el nombre de una carta.', dupe:'Ya intentaste esa carta.', fail:'No se pudo cargar la carta ({e}).', retry:'Reintentar',
+    played:'Partidas', rate:'% victorias', streak:'Racha', best:'Mejor', won:'Victorias', avg:'Intentos promedio', pts:'Puntos totales', today:'Hoy', dist:'Distribución de aciertos',
+    helpHtml:'<h2>Cómo Jugar</h2><p>Identifica la carta misteriosa de Magic a partir de una imagen borrosa. Tienes <b>5 intentos</b>; cada error hace la carta más nítida.</p><p>Puntos: 1000 / 800 / 600 / 400 / 200 por acertar en el intento 1–5.</p><p><b>Desafío Diario</b>: una carta por día (UTC), cuenta para tu racha. <b>Práctica</b>: cartas aleatorias ilimitadas, sin efecto en las estadísticas.</p><p>Los nombres e imágenes de las cartas siempre están en inglés. Cualquier impresión sirve; solo importa el nombre de la carta.</p>',
+    foot:'Datos e imágenes de cartas cortesía de <a href="https://scryfall.com" target="_blank" rel="noopener">Scryfall</a>. Magic: The Gathering es © Wizards of the Coast. Magicdle es contenido no oficial de fans, sin aprobación ni respaldo de Wizards of the Coast ni de Scryfall.' }
+};
+const FN = { standard:'Standard', pioneer:'Pioneer', modern:'Modern', legacy:'Legacy', vintage:'Vintage', commander:'Commander', pauper:'Pauper', premodern:'Premodern', duel:'Duel Commander' };
+let fmt = null;
+Object.assign(I18N.en, { fmtLabel:'Format:', fmtAll:'All formats', practiceFmtSub:'Only {f}-legal cards — no effect on your streak' });
+Object.assign(I18N.pt, { fmtLabel:'Formato:', fmtAll:'Todos os formatos', practiceFmtSub:'Só cartas legais em {f} — não afeta sua sequência' });
+Object.assign(I18N.es, { fmtLabel:'Formato:', fmtAll:'Todos los formatos', practiceFmtSub:'Solo cartas legales en {f} — no afecta tu racha' });
+let lang = (() => { try { const s = localStorage.getItem('mtgc_lang'); if (I18N[s]) return s; } catch {} const n = (navigator.language || 'en').slice(0, 2); return I18N[n] ? n : 'en'; })();
+const t = (k, v = {}) => (I18N[lang][k] ?? I18N.en[k]).replace(/\{(\w+)\}/g, (_, x) => v[x]);
+const LOCALE = { pt: 'pt-BR', en: 'en-US', es: 'es-ES' };
+
+/* ---------- Storage (swap for cloud sync later) ---------- */
+const store = {
+  get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+
+/* ---------- Scryfall integration ---------- */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function api(path, tries = 3) {
+  for (let i = 0; i < tries; i++) {
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 10000);
+    try {
+      const r = await fetch(API + path, { signal: ctl.signal, headers: { Accept: 'application/json' } });
+      clearTimeout(t);
+      if (r.status === 429 || r.status >= 500) { await sleep(600 * (i + 1)); continue; }
+      if (!r.ok) throw new Error('Scryfall error ' + r.status);
+      return await r.json();
+    } catch (e) { clearTimeout(t); if (i === tries - 1) throw e; await sleep(500 * (i + 1)); }
+  }
+  throw new Error('Scryfall unavailable');
+}
+function slim(c) {
+  const f = c.image_uris ? c : (c.card_faces || []).find(x => x.image_uris);
+  if (!f) return null;
+  return { name: c.name, oracle: c.oracle_id, image: f.image_uris.normal };
+}
+async function randomCard(f) {
+  for (let i = 0; i < 6; i++) {
+    const c = slim(await api('/cards/random?q=' + encodeURIComponent(f ? `f:${f} ${POOL}` : POOL)));
+    if (c) return c;
+    await sleep(120);
+  }
+  throw new Error('No usable card found');
+}
+/* Deterministic daily pick: seeded index into the sorted search result. */
+function hash(s) { let h = 2166136261; for (const ch of s) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } h ^= h >>> 15; h = Math.imul(h, 2246822507); h ^= h >>> 13; return h >>> 0; }
+async function dailyCard(dateKey, f) {
+  const base = '/cards/search?unique=cards&order=name&q=' + encodeURIComponent(f ? `f:${f} ${POOL}` : POOL);
+  const first = await api(base);
+  const total = first.total_cards, per = 175;
+  for (let n = 0; n < 8; n++) {
+    const idx = hash(dateKey + (f ? ':' + f : '') + ':' + n) % total;
+    const page = Math.floor(idx / per) + 1;
+    await sleep(120);
+    const data = page === 1 ? first : await api(base + '&page=' + page);
+    const c = data.data[idx % per] && slim(data.data[idx % per]);
+    if (c) return c;
+  }
+  throw new Error('Could not pick a daily card');
+}
+
+/* ---------- Dates (UTC => same day for everyone) ---------- */
+const utcKey = () => new Date().toISOString().slice(0, 10);
+const dayNo = () => Math.floor((Date.now() - EPOCH) / 864e5) + 1;
+const norm = s => s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+const sameCard = (a, b) => { const A = norm(a), B = norm(b); return A === B || norm(A.split(' // ')[0]) === B || A === norm(B.split(' // ')[0]); };
+
+/* ---------- Stats ---------- */
+const defStats = { played: 0, won: 0, streak: 0, best: 0, points: 0, dist: [0, 0, 0, 0, 0], lastWin: null };
+const getStats = () => ({ ...defStats, ...store.get('mtgc_stats', {}) });
+function recordDaily(won, attempts, key) {
+  const s = getStats(); s.played++;
+  if (won) {
+    s.won++; s.points += PTS[attempts - 1]; s.dist[attempts - 1]++;
+    const y = new Date(Date.parse(key) - 864e5).toISOString().slice(0, 10);
+    s.streak = s.lastWin === y ? s.streak + 1 : 1; s.lastWin = key; s.best = Math.max(s.best, s.streak);
+  } else s.streak = 0;
+  store.set('mtgc_stats', s);
+}
+
+/* ---------- Game state (answer lives only in this closure) ---------- */
+let mode = 'daily', secret = null, guesses = [], done = false, won = false, dKey = utcKey();
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function render() {
+  $('title').textContent = mode === 'daily' ? t('dailyTitle', { n: dayNo() }) : t('practiceTitle');
+  $('date').textContent = mode === 'practice' ? (fmt ? t('practiceFmtSub', { f: FN[fmt] }) : t('practiceSub')) : new Date().toLocaleDateString(LOCALE[lang], { dateStyle: 'full', timeZone: 'UTC' }) + ' (UTC)';
+  $('fmtRow').hidden = mode !== 'practice';
+  $('nDaily').classList.toggle('on', mode === 'daily'); $('nPractice').classList.toggle('on', mode === 'practice');
+  const n = guesses.length;
+  $('pips').innerHTML = Array.from({ length: MAX }, (_, i) => `<div class="pip ${i < n ? (done && won && i === n - 1 ? 'ok' : 'bad') : ''}"></div>`).join('');
+  $('left').textContent = done ? '' : t('attempt', { n: n + 1, m: MAX, r: MAX - n });
+  $('guesses').innerHTML = guesses.filter(g => !(done && won && g === guesses[n - 1])).map(g => `<div class="g"><span>${esc(g)}</span><span>✗</span></div>`).join('');
+  $('searchRow').style.display = done ? 'none' : 'flex';
+  const img = $('img');
+  img.style.filter = `blur(${done ? 0 : BLUR[Math.min(n, MAX - 1)]}px)`;
+  const res = $('result');
+  if (!done) { res.innerHTML = ''; return; }
+  const pts = won ? PTS[n - 1] : 0;
+  res.innerHTML = `<div class="res ${won ? 'win' : ''}">
+    <h2>${won ? t('win') : t('lose')}</h2>
+    <p><b>${esc(secret.name)}</b></p>
+    <p>${won ? t(n > 1 ? 'solvedN' : 'solved1', { n, p: pts }) : t('loseSub')}</p>
+    ${mode === 'daily' ? `<button class="primary" id="share">${t('share')}</button> <span class="sub">${t('next')}</span>` : `<button class="primary" id="again">${t('again')}</button>`}
+  </div>`;
+  if ($('share')) $('share').onclick = share;
+  if ($('again')) $('again').onclick = () => start('practice');
+}
+
+async function share() {
+  const cells = Array.from({ length: MAX }, (_, i) => won && i === guesses.length - 1 ? '🟨' : i < guesses.length ? '⬛' : '⬜').join('');
+  const text = `MAGICDLE #${dayNo()}\n\n${cells}\n\n${t('score', { p: won ? PTS[guesses.length - 1] : 0 })}\n\n${t('tomorrow')}`;
+  try { if (navigator.share) await navigator.share({ text }); else throw 0; }
+  catch { try { await navigator.clipboard.writeText(text); $('msg').style.color = 'var(--ok)'; $('msg').textContent = t('copied'); } catch { prompt(t('copyPrompt'), text); } }
+}
+
+async function start(m) {
+  mode = m; secret = null; guesses = []; done = false; won = false; dKey = utcKey();
+  $('msg').textContent = ''; $('q').value = ''; hideDD();
+  $('card').classList.add('loading'); $('img').removeAttribute('src'); $('img').style.filter = 'blur(30px)';
+  $('searchRow').style.display = 'flex'; $('go').disabled = true; render();
+  try {
+    if (m === 'daily') {
+      let saved = store.get('mtgc_daily', null);
+      if (!saved || saved.date !== dKey) { saved = { date: dKey, card: await dailyCard(dKey), guesses: [], done: false, won: false }; store.set('mtgc_daily', saved); }
+      secret = saved.card; guesses = saved.guesses; done = saved.done; won = saved.won;
+    } else secret = await randomCard(fmt);
+    await new Promise((ok, no) => { const i = $('img'); i.onload = ok; i.onerror = () => no(new Error('Card image failed to load')); i.src = secret.image; });
+    $('card').classList.remove('loading'); $('go').disabled = false; render();
+  } catch (e) {
+    $('msg').style.color = 'var(--bad)';
+    $('msg').innerHTML = `${esc(t('fail', { e: e.message }))} <button id="retry">${t('retry')}</button>`;
+    $('retry').onclick = () => start(m);
+  }
+}
+
+function submit(name) {
+  if (done || !secret) return;
+  name = (name || $('q').value).replace(/\s+/g, ' ').trim();
+  const msg = $('msg'); msg.style.color = 'var(--bad)';
+  if (!name) { msg.textContent = t('empty'); return; }
+  if (guesses.some(g => norm(g) === norm(name))) { msg.textContent = t('dupe'); return; }
+  msg.textContent = ''; $('q').value = ''; hideDD();
+  guesses.push(name);
+  if (sameCard(name, secret.name)) { done = true; won = true; }
+  else if (guesses.length >= MAX) { done = true; won = false; }
+  else { $('card').animate([{ transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'none' }], 250); }
+  if (mode === 'daily') {
+    store.set('mtgc_daily', { date: dKey, card: secret, guesses, done, won });
+    if (done) recordDaily(won, guesses.length, dKey);
+  }
+  render();
+}
+
+/* ---------- Autocomplete ---------- */
+let sugg = [], sel = -1, timer = 0, reqId = 0;
+function hideDD() { $('dd').hidden = true; sugg = []; sel = -1; }
+function drawDD() {
+  const dd = $('dd');
+  dd.hidden = !sugg.length;
+  dd.innerHTML = sugg.map((s, i) => `<div class="${i === sel ? 'sel' : ''}" data-i="${i}">${esc(s)}</div>`).join('');
+}
+$('q').addEventListener('input', () => {
+  clearTimeout(timer);
+  const v = $('q').value.trim();
+  if (v.length < 2) return hideDD();
+  timer = setTimeout(async () => {
+    const id = ++reqId;
+    try {
+      let d;
+      if (mode === 'practice' && fmt) { const r = await api('/cards/search?unique=cards&order=name&q=' + encodeURIComponent(`f:${fmt} lang:en ${v}`), 2); d = { data: r.data.map(c => c.name) }; }
+      else d = await api('/cards/autocomplete?q=' + encodeURIComponent(v), 2);
+      if (id === reqId) { sugg = d.data.slice(0, 10); sel = -1; drawDD(); }
+    } catch { if (id === reqId) hideDD(); }
+  }, 250);
+});
+$('q').addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown' && sugg.length) { e.preventDefault(); sel = (sel + 1) % sugg.length; drawDD(); }
+  else if (e.key === 'ArrowUp' && sugg.length) { e.preventDefault(); sel = (sel - 1 + sugg.length) % sugg.length; drawDD(); }
+  else if (e.key === 'Enter') { e.preventDefault(); submit(sel >= 0 ? sugg[sel] : null); }
+  else if (e.key === 'Escape') hideDD();
+});
+$('dd').addEventListener('mousedown', e => { const i = e.target.dataset.i; if (i !== undefined) { e.preventDefault(); submit(sugg[+i]); } });
+$('go').onclick = () => submit();
+document.addEventListener('click', e => { if (!e.target.closest('.search')) hideDD(); });
+
+/* ---------- Modals & nav ---------- */
+function showStats() {
+  const s = getStats(), mx = Math.max(1, ...s.dist);
+  const avg = s.won ? (s.dist.reduce((a, c, i) => a + c * (i + 1), 0) / s.won).toFixed(2) : '–';
+  $('mStats').querySelector('.box').innerHTML = `<h2>${t('stats')}</h2>
+    <div class="stats"><div><b>${s.played}</b><span>${t('played')}</span></div><div><b>${s.played ? Math.round(100 * s.won / s.played) : 0}%</b><span>${t('rate')}</span></div><div><b>${s.streak}</b><span>${t('streak')}</span></div><div><b>${s.best}</b><span>${t('best')}</span></div></div>
+    <div class="stats"><div><b>${s.won}</b><span>${t('won')}</span></div><div><b>${avg}</b><span>${t('avg')}</span></div><div><b>${s.points}</b><span>${t('pts')}</span></div><div><b>${mode === 'daily' && done && won ? PTS[guesses.length - 1] : 0}</b><span>${t('today')}</span></div></div>
+    <h3 style="font-family:Cinzel,serif;color:var(--gold2)">${t('dist')}</h3>
+    ${s.dist.map((c, i) => `<div class="bar">${i + 1}<i style="width:${Math.round(c / mx * 85)}%"></i>${c}</div>`).join('')}
+    <p><button data-close>${t('close')}</button></p>`;
+  $('mStats').classList.add('show');
+}
+document.addEventListener('click', e => { if (e.target.matches('[data-close]') || e.target.classList.contains('modal')) document.querySelectorAll('.modal').forEach(m => m.classList.remove('show')); });
+$('nStats').onclick = showStats;
+$('nHelp').onclick = () => $('mHelp').classList.add('show');
+$('nDaily').onclick = () => start('daily');
+$('nPractice').onclick = () => start('practice');
+function applyStatic() {
+  document.documentElement.lang = LOCALE[lang];
+  $('nDaily').textContent = t('daily'); $('nPractice').textContent = t('practice'); $('nStats').textContent = t('stats'); $('nHelp').textContent = t('help');
+  $('q').placeholder = t('ph'); $('go').textContent = t('guess');
+  $('card').dataset.loading = t('loading'); $('img').alt = t('alt');
+  $('helpBox').innerHTML = t('helpHtml') + `<button data-close>${t('close')}</button>`;
+  $('foot').innerHTML = t('foot'); $('lang').value = lang;
+  $('fmtLbl').textContent = t('fmtLabel');
+  $('fmtSel').innerHTML = `<option value="">${t('fmtAll')}</option>` + Object.keys(FN).map(k => `<option value="${k}">${FN[k]}</option>`).join('');
+  $('fmtSel').value = fmt || '';
+}
+$('lang').onchange = e => { lang = e.target.value; store.set('mtgc_lang', lang); applyStatic(); render(); if ($('mStats').classList.contains('show')) showStats(); };
+$('fmtSel').onchange = e => { fmt = e.target.value || null; store.set('mtgc_pfmt', fmt); start('practice'); };
+fmt = store.get('mtgc_pfmt', null); if (!FN[fmt]) fmt = null;
+applyStatic();
+start('daily');
+</script>
+</body>
+</html>
