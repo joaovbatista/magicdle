@@ -6,6 +6,9 @@
 <title>Magicdle</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='14' y='4' width='36' height='56' rx='5' fill='%2317171b' stroke='%23c9a24b' stroke-width='3'/%3E%3Cpath d='M32 15l4.2 10.4 11.2.9-8.6 7.2 2.7 10.9L32 38.8l-9.5 5.6 2.7-10.9-8.6-7.2 11.2-.9z' fill='%23c9a24b'/%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
 :root{--bg:#0c0c0e;--panel:#17171b;--line:#2c2a25;--gold:#c9a24b;--gold2:#e8cf8a;--txt:#e9e6df;--mut:#8d8a82;--bad:#a8423a;--ok:#4f9a5b}
 *{box-sizing:border-box}
@@ -64,6 +67,8 @@ footer a{color:var(--gold)}
     <button id="nPractice">Practice</button>
     <button id="nStats">Statistics</button>
     <button id="nHelp">How to Play</button>
+    <button id="nRank" hidden>Ranking</button>
+    <button id="nAuth" hidden></button>
     <select id="lang" aria-label="Language"><option value="pt">Português</option><option value="en">English</option><option value="es">Español</option></select>
   </nav>
 </header>
@@ -88,6 +93,7 @@ footer a{color:var(--gold)}
 <footer id="foot"></footer>
 
 <div class="modal" id="mStats"><div class="box"></div></div>
+<div class="modal" id="mRank"><div class="box" id="rankBox"></div></div>
 <div class="modal" id="mHelp"><div class="box" id="helpBox"></div></div>
 
 <script>
@@ -130,6 +136,9 @@ let fmt = null;
 Object.assign(I18N.en, { fmtLabel:'Format:', fmtAll:'All formats', practiceFmtSub:'Only {f}-legal cards — no effect on your streak' });
 Object.assign(I18N.pt, { fmtLabel:'Formato:', fmtAll:'Todos os formatos', practiceFmtSub:'Só cartas legais em {f} — não afeta sua sequência' });
 Object.assign(I18N.es, { fmtLabel:'Formato:', fmtAll:'Todos los formatos', practiceFmtSub:'Solo cartas legales en {f} — no afecta tu racha' });
+Object.assign(I18N.en, { signin:'Sign in with Google', rank:'Ranking', rkToday:'Today', rkAll:'All-time', loginNeeded:'Sign in to play the Daily Challenge and join the ranking.', nick:'Choose your nickname (2–24 characters):', notReady:"Today's card isn't ready yet. Try again in a few minutes." });
+Object.assign(I18N.pt, { signin:'Entrar com Google', rank:'Ranking', rkToday:'Hoje', rkAll:'Geral', loginNeeded:'Entre para jogar o Desafio Diário e participar do ranking.', nick:'Escolha seu apelido (2–24 caracteres):', notReady:'A carta de hoje ainda não está pronta. Tente de novo em alguns minutos.' });
+Object.assign(I18N.es, { signin:'Entrar con Google', rank:'Ranking', rkToday:'Hoy', rkAll:'General', loginNeeded:'Inicia sesión para jugar el Desafío Diario y entrar al ranking.', nick:'Elige tu apodo (2–24 caracteres):', notReady:'La carta de hoy aún no está lista. Inténtalo de nuevo en unos minutos.' });
 let lang = (() => { try { const s = localStorage.getItem('mtgc_lang'); if (I18N[s]) return s; } catch {} const n = (navigator.language || 'en').slice(0, 2); return I18N[n] ? n : 'en'; })();
 const t = (k, v = {}) => (I18N[lang][k] ?? I18N.en[k]).replace(/\{(\w+)\}/g, (_, x) => v[x]);
 const LOCALE = { pt: 'pt-BR', en: 'en-US', es: 'es-ES' };
@@ -247,7 +256,8 @@ async function start(m) {
   $('card').classList.add('loading'); $('img').removeAttribute('src'); $('img').style.filter = 'blur(30px)';
   $('searchRow').style.display = 'flex'; $('go').disabled = true; render();
   try {
-    if (m === 'daily') {
+    if (m === 'daily' && fb) { if (!(await loadOnline())) return; }
+    else if (m === 'daily') {
       let saved = store.get('mtgc_daily', null);
       if (!saved || saved.date !== dKey) { saved = { date: dKey, card: await dailyCard(dKey), guesses: [], done: false, won: false }; store.set('mtgc_daily', saved); }
       secret = saved.card; guesses = saved.guesses; done = saved.done; won = saved.won;
@@ -268,6 +278,7 @@ function submit(name) {
   if (!name) { msg.textContent = t('empty'); return; }
   if (guesses.some(g => norm(g) === norm(name))) { msg.textContent = t('dupe'); return; }
   msg.textContent = ''; $('q').value = ''; hideDD();
+  if (mode === 'daily' && fb) return submitOnline(name);
   guesses.push(name);
   if (sameCard(name, secret.name)) { done = true; won = true; }
   else if (guesses.length >= MAX) { done = true; won = false; }
@@ -328,6 +339,97 @@ $('nStats').onclick = showStats;
 $('nHelp').onclick = () => $('mHelp').classList.add('show');
 $('nDaily').onclick = () => start('daily');
 $('nPractice').onclick = () => start('practice');
+/* ---------- Firebase (login + global ranking). Leave null to play fully offline ---------- */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAxaVO-AzigpYdldAiTQ-eFPBtRFrVDRAE",
+  authDomain: "magicdle-ebe68.firebaseapp.com",
+  projectId: "magicdle-ebe68",
+  storageBucket: "magicdle-ebe68.firebasestorage.app",
+  messagingSenderId: "984502194608",
+  appId: "1:984502194608:web:53a6c89a958666b812c675",
+  measurementId: "G-STR8SV4SQS"
+}; // paste your Firebase web app config object here
+let fb = null;
+const ts = () => firebase.firestore.FieldValue.serverTimestamp();
+function fbInit() {
+  if (!FIREBASE_CONFIG || !window.firebase) return;
+  firebase.initializeApp(FIREBASE_CONFIG);
+  const auth = firebase.auth(), db = firebase.firestore();
+  fb = { auth, db, user: null, me: null };
+  let first = true;
+  fb.ready = new Promise(res => auth.onAuthStateChanged(async u => {
+    fb.user = u; fb.me = null;
+    if (u) { try { await loadMe(); } catch (e) { console.error(e); } }
+    renderAuth();
+    if (first) { first = false; res(); } else if (mode === 'daily') start('daily');
+  }));
+}
+async function loadMe() {
+  const ref = fb.db.doc('users/' + fb.user.uid), snap = await ref.get();
+  if (snap.exists) { fb.me = snap.data(); return; }
+  const nick = (prompt(t('nick'), (fb.user.displayName || '').split(' ')[0]) || '').trim().slice(0, 24);
+  const me = { name: nick.length >= 2 ? nick : 'Player' + fb.user.uid.slice(0, 4), points: 0, wins: 0, played: 0, lastPlay: '' };
+  await ref.set(me); fb.me = me;
+}
+const signIn = () => fb.auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e => { $('msg').textContent = e.message; });
+function renderAuth() {
+  $('nRank').hidden = false; $('nAuth').hidden = false;
+  $('nAuth').textContent = fb.user ? (fb.me ? fb.me.name : '…') + ' ⎋' : t('signin');
+}
+$('nAuth').onclick = () => fb.user ? fb.auth.signOut() : signIn();
+$('nRank').onclick = () => showRank('today');
+$('rankBox').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) showRank(b.dataset.tab); });
+
+async function claim(won, n) { // verified server-side by Firestore rules; denied = not true
+  const uid = fb.user.uid, me = fb.me, pts = won ? PTS[n - 1] : 0, b = fb.db.batch();
+  b.set(fb.db.doc('results/' + dKey + '_' + uid), { uid, name: me.name, date: dKey, won, attempts: n, points: pts, at: ts() });
+  b.update(fb.db.doc('users/' + uid), { points: me.points + pts, wins: me.wins + (won ? 1 : 0), played: me.played + 1, lastPlay: dKey });
+  try { await b.commit(); Object.assign(me, { points: me.points + pts, wins: me.wins + (won ? 1 : 0), played: me.played + 1, lastPlay: dKey }); return true; }
+  catch (e) { if (e.code === 'permission-denied') return false; throw e; }
+}
+async function settle(n) {
+  if (await claim(true, n)) { done = true; won = true; secret.name = guesses[n - 1]; }
+  else if (n >= MAX && await claim(false, MAX)) { done = true; won = false; secret.name = (await fb.db.doc('secret/' + dKey).get()).data().title; }
+  if (done) recordDaily(won, n, dKey);
+}
+async function loadOnline() {
+  await fb.ready;
+  if (!fb.user || !fb.me) {
+    render(); $('searchRow').style.display = 'none'; $('card').classList.remove('loading'); $('card').dataset.loading = '🔒';
+    $('result').innerHTML = `<div class="res">${t('loginNeeded')}<p><button class="primary" id="login2">${t('signin')}</button></p></div>`;
+    $('login2').onclick = signIn; return false;
+  }
+  const d = await fb.db.doc('daily/' + dKey).get();
+  if (!d.exists) throw new Error(t('notReady'));
+  secret = { name: '', image: d.data().image };
+  const pid = dKey + '_' + fb.user.uid;
+  guesses = (await fb.db.collection('plays/' + pid + '/guesses').get()).docs.sort((a, b) => a.id - b.id).map(x => x.data().name);
+  const r = await fb.db.doc('results/' + pid).get();
+  if (r.exists) { done = true; won = r.data().won; secret.name = won ? guesses[guesses.length - 1] : (await fb.db.doc('secret/' + dKey).get()).data().title; }
+  else if (guesses.length) await settle(guesses.length);
+  return true;
+}
+async function submitOnline(name) {
+  const n = guesses.length + 1;
+  $('go').disabled = true;
+  try {
+    await fb.db.doc(`plays/${dKey}_${fb.user.uid}/guesses/${n}`).set({ name, at: ts() });
+    guesses.push(name);
+    await settle(n);
+    if (!done) $('card').animate([{ transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'none' }], 250);
+  } catch (e) { $('msg').style.color = 'var(--bad)'; $('msg').textContent = e.message; }
+  $('go').disabled = false; render();
+}
+async function showRank(tab) {
+  $('mRank').classList.add('show');
+  $('rankBox').innerHTML = `<h2>${t('rank')}</h2><div class="fgrid"><button data-tab="today" class="${tab === 'today' ? 'on' : ''}">${t('rkToday')}</button><button data-tab="all" class="${tab === 'all' ? 'on' : ''}">${t('rkAll')}</button></div><div id="rkBody">…</div><p><button data-close>${t('close')}</button></p>`;
+  try {
+    const q = tab === 'today' ? fb.db.collection('results').where('date', '==', utcKey()).orderBy('points', 'desc').orderBy('at', 'asc') : fb.db.collection('users').orderBy('points', 'desc');
+    const snap = await q.limit(20).get();
+    $('rkBody').innerHTML = snap.docs.map((d, i) => { const x = d.data(); return `<div class="bar"><b>${i + 1}</b><span style="flex:1">${esc(x.name)}</span><span>${tab === 'today' ? (x.won ? x.attempts + '/' + MAX : '✗') : x.wins + ' 🏆'} · ${x.points}</span></div>`; }).join('') || '—';
+  } catch (e) { $('rkBody').textContent = e.message; }
+}
+
 function applyStatic() {
   document.documentElement.lang = LOCALE[lang];
   $('nDaily').textContent = t('daily'); $('nPractice').textContent = t('practice'); $('nStats').textContent = t('stats'); $('nHelp').textContent = t('help');
@@ -338,10 +440,12 @@ function applyStatic() {
   $('fmtLbl').textContent = t('fmtLabel');
   $('fmtSel').innerHTML = `<option value="">${t('fmtAll')}</option>` + Object.keys(FN).map(k => `<option value="${k}">${FN[k]}</option>`).join('');
   $('fmtSel').value = fmt || '';
+  $('nRank').textContent = t('rank'); if (fb) renderAuth();
 }
 $('lang').onchange = e => { lang = e.target.value; store.set('mtgc_lang', lang); applyStatic(); render(); if ($('mStats').classList.contains('show')) showStats(); };
 $('fmtSel').onchange = e => { fmt = e.target.value || null; store.set('mtgc_pfmt', fmt); start('practice'); };
 fmt = store.get('mtgc_pfmt', null); if (!FN[fmt]) fmt = null;
+fbInit();
 applyStatic();
 start('daily');
 </script>
