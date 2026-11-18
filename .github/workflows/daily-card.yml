@@ -1,0 +1,17 @@
+name: Pick daily card
+on:
+  schedule:
+    - cron: '30 23 * * *'   # prepares tomorrow's card
+    - cron: '10 0 * * *'    # safety net for today's card
+  workflow_dispatch:
+jobs:
+  pick:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm install firebase-admin@12
+      - run: node scripts/pick-daily-card.mjs
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}

@@ -1,0 +1,74 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function pad(x) { return x < 10 ? '0' + string(x) : string(x); }
+    function today() { return string(request.time.year()) + '-' + pad(request.time.month()) + '-' + pad(request.time.day()); }
+    function hit(d, name) { return name.lower() in get(/databases/$(db)/documents/secret/$(d)).data.names; }
+    function gpath(pid, n) { return /databases/$(db)/documents/plays/$(pid)/guesses/$(n); }
+    function rpath(d, uid) { return /databases/$(db)/documents/results/$(d + '_' + uid); }
+    function prevOf(n) { return {'2': '1', '3': '2', '4': '3', '5': '4'}[n]; }
+
+    // Daily card (image only). Written by the GitHub Action (Admin SDK).
+    match /daily/{d} { allow read: if true; }
+
+    // The answer. Clients can only read it AFTER finishing that day.
+    match /secret/{d} {
+      allow read: if request.auth != null && exists(rpath(d, request.auth.uid));
+    }
+
+    // One doc per attempt, create-only, strictly in order, none after a correct guess.
+    match /plays/{pid}/guesses/{n} {
+      allow read: if request.auth != null && pid.split('_')[1] == request.auth.uid;
+      allow create: if request.auth != null
+        && pid.split('_')[1] == request.auth.uid
+        && pid.split('_')[0] == today()
+        && n in ['1', '2', '3', '4', '5']
+        && request.resource.data.keys().hasOnly(['name', 'at'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() < 150
+        && request.resource.data.at == request.time
+        && (n == '1' || (exists(gpath(pid, prevOf(n)))
+            && !hit(pid.split('_')[0], get(gpath(pid, prevOf(n))).data.name)));
+    }
+
+    // One result per player per day, verified against the secret and the guesses.
+    match /results/{rid} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && rid.split('_')[1] == request.auth.uid
+        && rid.split('_')[0] == today()
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'date', 'won', 'attempts', 'points', 'at'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.date == rid.split('_')[0]
+        && request.resource.data.won is bool
+        && request.resource.data.attempts is int
+        && request.resource.data.attempts >= 1 && request.resource.data.attempts <= 5
+        && request.resource.data.points == (request.resource.data.won ? [1000, 800, 600, 400, 200][request.resource.data.attempts - 1] : 0)
+        && request.resource.data.at == request.time
+        && request.resource.data.name == getAfter(/databases/$(db)/documents/users/$(request.auth.uid)).data.name
+        && exists(gpath(rid, string(request.resource.data.attempts)))
+        && request.resource.data.won == hit(request.resource.data.date, get(gpath(rid, string(request.resource.data.attempts))).data.name)
+        && (request.resource.data.won || request.resource.data.attempts == 5);
+    }
+
+    // Totals can only grow by exactly the verified result written in the same batch.
+    match /users/{uid} {
+      allow read: if true;
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'points', 'wins', 'played', 'lastPlay'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 24
+        && request.resource.data.points == 0 && request.resource.data.wins == 0
+        && request.resource.data.played == 0 && request.resource.data.lastPlay == '';
+      allow update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'points', 'wins', 'played', 'lastPlay'])
+        && request.resource.data.name == resource.data.name
+        && request.resource.data.lastPlay is string
+        && !exists(rpath(request.resource.data.lastPlay, uid))
+        && existsAfter(rpath(request.resource.data.lastPlay, uid))
+        && request.resource.data.points == resource.data.points + getAfter(rpath(request.resource.data.lastPlay, uid)).data.points
+        && request.resource.data.played == resource.data.played + 1
+        && request.resource.data.wins == resource.data.wins + (getAfter(rpath(request.resource.data.lastPlay, uid)).data.won ? 1 : 0);
+    }
+  }
+}
